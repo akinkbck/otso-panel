@@ -44,6 +44,43 @@ function fmtNum(v) {
   return typeof v === 'number' ? v.toLocaleString('tr-TR') : String(v == null ? '' : v);
 }
 
+// Arama ve filtre için metni sadeleştirir: Türkçe kurallarıyla küçültür, sonra
+// işaretleri atar. Böylece "ISTANBUL", "İstanbul" ve "istanbul" ya da "egitim" ve
+// "Eğitim" aynı sayılır.
+function fold(v) {
+  return String(v == null ? '' : v)
+    .toLocaleLowerCase('tr')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ı/g, 'i');
+}
+
+// Sıralama anahtarı: sütunun türüne göre karşılaştırılabilir bir değer üretir.
+const NUMERIC_COLS = [3, 8, 9]; // Süre, Katılımcı, Ücret
+
+function sortKey(row, col) {
+  const v = row[col];
+  if (v === '' || v == null) return null; // boşlar her zaman sonda
+  if (col === 1) {
+    // GG.AA.YYYY -> YYYYAAGG (gün değil, takvim sırası)
+    const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(v).trim());
+    return m ? Number(m[3]) * 10000 + Number(m[2]) * 100 + Number(m[1]) : fold(v);
+  }
+  if (NUMERIC_COLS.includes(col)) return num(v);
+  return fold(v);
+}
+
+function applySort() {
+  if (sortCol < 0) return;
+  const dir = sortAsc ? 1 : -1;
+  allRows.sort((a, b) => {
+    const ka = sortKey(a, sortCol), kb = sortKey(b, sortCol);
+    if (ka === null || kb === null) return (ka === null) - (kb === null);
+    if (typeof ka === 'number' && typeof kb === 'number') return (ka - kb) * dir;
+    return String(ka).localeCompare(String(kb), 'tr', { numeric: true }) * dir;
+  });
+}
+
 //  SUNUCU
 // Apps Script adresini alır. Sunucu, arka uç korumalı sürümde değilse adresi vermez.
 async function loadConfig() {
@@ -190,6 +227,7 @@ async function loadData() {
       return cols;
     });
     updateStats();
+    applySort(); // seçili sıralama yenilemeden ve kayıttan sonra da korunur
     filterTable();
     $('last-update').textContent = 'Son güncelleme: ' + new Date().toLocaleString('tr-TR');
   } catch (e) {
@@ -267,14 +305,14 @@ function renderTable(rows) {
 }
 
 function filterTable() {
-  const q   = $('search').value.toLowerCase();
-  const dur = $('f-durum').value.toLowerCase();
-  const kat = $('f-kategori').value.toLowerCase();
+  const q   = fold($('search').value).trim();
+  const dur = fold($('f-durum').value);
+  const kat = fold($('f-kategori').value);
   const filtered = allRows.filter(r => {
-    const text = r.slice(0, 14).join(' ').toLowerCase();
+    const text = fold(r.slice(0, 14).join(' '));
     return (!q   || text.includes(q))
-        && (!dur || String(r[10]).toLowerCase().includes(dur))
-        && (!kat || String(r[11]).toLowerCase().includes(kat));
+        && (!dur || fold(r[10]).includes(dur))
+        && (!kat || fold(r[11]).includes(kat));
   });
   renderTable(filtered);
 }
@@ -282,12 +320,7 @@ function filterTable() {
 function sortTable(col) {
   if (sortCol === col) sortAsc = !sortAsc;
   else { sortCol = col; sortAsc = true; }
-  allRows.sort((a, b) => {
-    const va = String(a[col] === 0 ? '0' : (a[col] || '')), vb = String(b[col] === 0 ? '0' : (b[col] || ''));
-    const na = parseFloat(va.replace(/[^0-9.]/g, '')), nb = parseFloat(vb.replace(/[^0-9.]/g, ''));
-    if (!isNaN(na) && !isNaN(nb)) return sortAsc ? na - nb : nb - na;
-    return sortAsc ? va.localeCompare(vb, 'tr') : vb.localeCompare(va, 'tr');
-  });
+  applySort();
   filterTable();
 }
 
