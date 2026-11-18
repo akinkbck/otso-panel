@@ -1,0 +1,10 @@
+# Eski sürümlerin yedekleri: içlerinde PIN, tablo kimliği ve betik adresi var. Asla gönderilmemeli.
+_yedek_*/
+
+# Ortam değişkenleri ve Vercel yerel ayarları
+.env
+.env.*
+.vercel/
+
+node_modules/
+.DS_Store

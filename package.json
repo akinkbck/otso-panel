@@ -1,0 +1,7 @@
+{
+  "name": "otso-panel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ordu TSO etkinlik yönetim paneli (statik arayüz + Google Apps Script arka ucu)"
+}

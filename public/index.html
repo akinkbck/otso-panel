@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="referrer" content="no-referrer"/>
+  <title>Ordu TSO  Etkinlik Paneli</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+    }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #1a3a5c 0%, #2563a8 100%);
+      color: white;
+      padding: 24px 36px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    header .logo {
+      font-size: 2.4rem;
+    }
+    header .title h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    header .title p {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+    header .refresh-btn {
+      margin-left: auto;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    header .refresh-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* MAIN */
+    main { padding: 28px 36px; max-width: 1400px; margin: 0 auto; }
+
+    /* STAT CARDS */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 5px solid;
+      transition: transform 0.2s;
+    }
+    .card:hover { transform: translateY(-3px); }
+    .card.blue  { border-color: #2563a8; }
+    .card.green { border-color: #16a34a; }
+    .card.red   { border-color: #dc2626; }
+    .card.orange{ border-color: #ea580c; }
+    .card.purple{ border-color: #7c3aed; }
+    .card .icon { font-size: 1.7rem; margin-bottom: 8px; }
+    .card .val  { font-size: 1.9rem; font-weight: 700; }
+    .card .lbl  { font-size: 0.78rem; color: #718096; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* TOOLBAR */
+    .toolbar {
+      background: white;
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .toolbar input[type="text"] {
+      flex: 1;
+      min-width: 200px;
+      padding: 9px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border 0.2s;
+    }
+    .toolbar input[type="text"]:focus { border-color: #2563a8; }
+    .toolbar select {
+      padding: 9px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: white;
+      cursor: pointer;
+      outline: none;
+    }
+    .toolbar .count {
+      margin-left: auto;
+      font-size: 0.82rem;
+      color: #718096;
+      white-space: nowrap;
+    }
+
+    /* TABLE */
+    .table-wrap {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      min-width: 1800px;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    thead th {
+      background: #1a3a5c;
+      color: white;
+      padding: 13px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { background: #2563a8; }
+    thead th .sort-icon { margin-left: 4px; opacity: 0.5; }
+    tbody tr { border-bottom: 1px solid #f0f4f8; transition: background 0.15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f7faff; }
+    tbody td { padding: 11px 16px; vertical-align: middle; }
+
+    /* STATUS BADGE */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge.tamamlandi { background: #dcfce7; color: #16a34a; }
+    .badge.planlandi   { background: #dbeafe; color: #1d4ed8; }
+    .badge.taslak      { background: #f3f4f6; color: #6b7280; }
+    .badge.devam       { background: #fef9c3; color: #a16207; }
+
+    /* CATEGORY BADGE */
+    .cat {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      background: #ede9fe;
+      color: #6d28d9;
+      font-weight: 500;
+    }
+
+    /* LOADING / EMPTY */
+    .state-msg {
+      text-align: center;
+      padding: 60px 20px;
+      color: #718096;
+      font-size: 0.95rem;
+    }
+    .state-msg .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .state-btn {
+      background: #2563a8; border: none; color: white;
+      padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+    }
+    .state-btn:hover { background: #1a3a5c; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #2563a8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.78rem;
+      color: #a0aec0;
+    }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .modal h2 {
+      font-size: 1.2rem;
+      color: #1a3a5c;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal h2 .close-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: #a0aec0;
+      line-height: 1;
+    }
+    .modal h2 .close-btn:hover { color: #e53e3e; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border 0.2s;
+      background: white;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus { border-color: #2563a8; }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #f0f4f8;
+    }
+    .btn-cancel {
+      padding: 10px 20px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: #4a5568;
+    }
+    .btn-cancel:hover { background: #f7fafc; }
+    .btn-submit {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      background: #2563a8;
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover { background: #1a3a5c; }
+    .btn-submit:disabled { background: #a0aec0; cursor: not-allowed; }
+    .form-notice {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .form-notice.show { display: block; }
+    .add-btn {
+      background: #16a34a;
+      border: none;
+      color: white;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .add-btn:hover { background: #15803d; }
+
+    /* PIN OVERLAY */
+    .pin-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+    .pin-overlay.open { display: flex; }
+    .pin-box {
+      background: white;
+      border-radius: 16px;
+      padding: 36px 40px;
+      width: 340px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      animation: slideUp 0.2s ease;
+    }
+    .pin-box .pin-icon { font-size: 2.2rem; margin-bottom: 12px; }
+    .pin-box h3 { font-size: 1.1rem; color: #1a3a5c; margin-bottom: 6px; }
+    .pin-box p  { font-size: 0.82rem; color: #718096; margin-bottom: 20px; }
+    .pin-box input[type=password] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 1.4rem;
+      letter-spacing: 6px;
+      text-align: center;
+      outline: none;
+      transition: border 0.2s;
+      margin-bottom: 14px;
+    }
+    .pin-box input[type=password]:focus { border-color: #2563a8; }
+    .pin-box input[type=password].error { border-color: #dc2626; animation: shake 0.3s; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)}
+    }
+    .pin-submit {
+      width: 100%;
+      padding: 12px;
+      background: #2563a8;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .pin-submit:hover { background: #1a3a5c; }
+    .pin-submit:disabled { background: #a0aec0; cursor: not-allowed; }
+    .pin-err { color: #dc2626; font-size: 0.82rem; margin-top: 10px; display: none; }
+    .pin-cancel { margin-top: 10px; font-size: 0.8rem; color: #a0aec0; cursor: pointer; }
+    .pin-cancel:hover { color: #718096; }
+
+    /* LOCK BADGE in header */
+    .lock-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .lock-badge:hover { background: rgba(255,255,255,0.25); }
+    .lock-badge.unlocked { background: rgba(22,163,74,0.4); border-color: rgba(22,163,74,0.6); }
+
+    /* EDIT BUTTON */
+    .btn-edit {
+      background: none;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: #4a5568;
+      transition: all 0.15s;
+    }
+    .btn-edit:hover { background: #ebf4ff; border-color: #2563a8; color: #2563a8; }
+
+    /* RESPONSIVE */
+    @media (max-width: 700px) {
+      main { padding: 16px; }
+      header { padding: 16px; flex-wrap: wrap; }
+      .toolbar { flex-direction: column; align-items: stretch; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo"></div>
+  <div class="title">
+    <h1>Ordu Ticaret ve Sanayi Odası</h1>
+    <p>Etkinlik Yönetim Paneli</p>
+  </div>
+  <button class="refresh-btn" id="refresh-btn" type="button">Yenile</button>
+  <button class="lock-badge" id="lock-badge" type="button">Kilitli</button>
+</header>
+
+<main>
+  <!-- STAT CARDS -->
+  <div class="stats">
+    <div class="card blue">
+      <div class="val" id="s-total"></div>
+      <div class="lbl">Toplam Etkinlik</div>
+    </div>
+    <div class="card green">
+      <div class="val" id="s-done"></div>
+      <div class="lbl">Tamamlanan</div>
+    </div>
+    <div class="card blue" style="border-color:#0891b2">
+      <div class="val" id="s-plan"></div>
+      <div class="lbl">Planlanan</div>
+    </div>
+    <div class="card orange">
+      <div class="val" id="s-katilimci"></div>
+      <div class="lbl">Toplam Katılımcı</div>
+    </div>
+    <div class="card red">
+      <div class="val" id="s-ucret"></div>
+      <div class="lbl">Toplam Ödenen</div>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="  Etkinlik adı, eğitmen, konum ara" />
+    <select id="f-durum">
+      <option value="">Tüm Durumlar</option>
+      <option>Tamamlandı</option>
+      <option>Planlandı</option>
+      <option>Taslak</option>
+    </select>
+    <select id="f-kategori">
+      <option value="">Tüm Kategoriler</option>
+      <option>Seminer</option>
+      <option>Eğitim</option>
+      <option>Panel</option>
+      <option>Bilgilendirme</option>
+    </select>
+    <span class="count" id="row-count"></span>
+    <button class="add-btn" id="add-btn" type="button">+ Yeni Etkinlik Ekle</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <div id="loading" class="state-msg">
+      <div class="spinner"></div>
+      Veriler yükleniyor...
+    </div>
+    <table id="data-table" style="display:none">
+      <thead>
+        <tr>
+          <th data-sort="0">Etkinlik Adı <span class="sort-icon"></span></th>
+          <th data-sort="1">Tarih <span class="sort-icon"></span></th>
+          <th data-sort="2">Saat</th>
+          <th data-sort="3">Süre</th>
+          <th data-sort="4">Konum</th>
+          <th data-sort="5">Eğitmen</th>
+          <th>Eğitmen E-posta</th>
+          <th>Eğitmen Telefon</th>
+          <th data-sort="8">Katılımcı <span class="sort-icon"></span></th>
+          <th data-sort="9">Ücret (TL) <span class="sort-icon"></span></th>
+          <th data-sort="10">Durum <span class="sort-icon"></span></th>
+          <th data-sort="11">Kategori</th>
+          <th>Dosya</th>
+          <th>Notlar</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div id="empty" class="state-msg" style="display:none">
+      Arama kriterine uyan etkinlik bulunamadı.
+    </div>
+    <div id="locked" class="state-msg" style="display:none">
+      Etkinlikleri görmek için yetkili girişi yapın.<br><br>
+      <button class="state-btn" id="login-btn" type="button">Giriş Yap</button>
+    </div>
+    <div id="error" class="state-msg" style="display:none">
+      <strong id="error-text">Veri çekilemedi.</strong><br><br>
+      <button class="state-btn" id="retry-btn" type="button">Tekrar Dene</button>
+    </div>
+  </div>
+</main>
+
+<!-- PIN OVERLAY -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-box">
+    
+    <h3>Yetkili Girişi</h3>
+    <p>Paneli kullanmak için PIN kodunuzu girin.</p>
+    <input type="password" id="pin-input" maxlength="64" placeholder="" />
+    <button class="pin-submit" id="pin-submit" type="button">Giriş Yap</button>
+    <div class="pin-err" id="pin-err">Hatalı PIN. Lütfen tekrar deneyin.</div>
+    <div class="pin-cancel" id="pin-cancel">İptal</div>
+  </div>
+</div>
+
+<!-- MODAL FORM -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2><span id="modal-title">Yeni Etkinlik Ekle</span>
+      <button class="close-btn" id="modal-close" type="button">&#x2715;</button>
+    </h2>
+    <div class="form-notice" id="form-notice"></div>
+    <form id="etkinlik-form">
+      <input type="hidden" name="rowIndex" id="form-row-index" value="" />
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Etkinlik Ad&#305; *</label>
+          <input type="text" name="ad" required placeholder="&#214;rn: Giri&#351;imcilik Semineri" />
+        </div>
+        <div class="form-group">
+          <label>Tarih *</label>
+          <input type="date" name="tarih" required />
+        </div>
+        <div class="form-group">
+          <label>Saat *</label>
+          <input type="time" name="saat" required />
+        </div>
+        <div class="form-group">
+          <label>S&#252;re (Saat)</label>
+          <input type="number" name="sure" min="0.5" step="0.5" placeholder="&#214;rn: 3" />
+        </div>
+        <div class="form-group">
+          <label>Konum</label>
+          <input type="text" name="konum" placeholder="&#214;rn: Konferans Salonu" />
+        </div>
+        <div class="form-group">
+          <label>E&#287;itmen / Konu&#351;mac&#305;</label>
+          <input type="text" name="egitmen" placeholder="Ad Soyad" />
+        </div>
+        <div class="form-group">
+          <label>E&#287;itmen E-posta</label>
+          <input type="email" name="egitmenMail" placeholder="ornek@mail.com" />
+        </div>
+        <div class="form-group">
+          <label>E&#287;itmen Telefon</label>
+          <input type="tel" name="egitmenTel" placeholder="05xx xxx xx xx" />
+        </div>
+        <div class="form-group">
+          <label>Kat&#305;l&#305;mc&#305; Say&#305;s&#305;</label>
+          <input type="number" name="katilimci" min="0" placeholder="&#214;rn: 30" />
+        </div>
+        <div class="form-group">
+          <label>E&#287;itmen &#220;creti (&#8378;)</label>
+          <input type="number" name="ucret" min="0" step="50" placeholder="&#214;rn: 2500" />
+        </div>
+        <div class="form-group">
+          <label>Durum</label>
+          <select name="durum">
+            <option>Planland&#305;</option>
+            <option>Devam Ediyor</option>
+            <option>Tamamland&#305;</option>
+            <option>Taslak</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Kategori</label>
+          <select name="kategori">
+            <option value="">&#8212; Se&#231;iniz &#8212;</option>
+            <option>Seminer</option>
+            <option>E&#287;itim</option>
+            <option>Panel</option>
+            <option>Bilgilendirme</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>Etkinlik Dosyası</label>
+          <input type="file" name="eventFile" id="event-file"
+                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt,.csv" />
+          <small style="display:block;margin-top:6px;color:#718096">En fazla 10 MB. PDF, Word, Excel, PowerPoint, JPG, PNG, TXT veya CSV.</small>
+          <small id="current-file-link" style="display:block;margin-top:6px;color:#718096"></small>
+        </div>
+        <div class="form-group full">
+          <label>Notlar</label>
+          <textarea name="notlar" placeholder="Ek a&#231;&#305;klamalar&#8230;"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" id="modal-cancel">&#304;ptal</button>
+        <button type="submit" class="btn-submit" id="submit-btn">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer>
+  Ordu TSO Etkinlik Paneli &nbsp;|&nbsp; <span id="last-update"></span>
+</footer>
+
+<script src="app.js" defer></script>
+</body>
+</html>
