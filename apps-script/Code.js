@@ -46,9 +46,12 @@ const PIN_LOCK_SECONDS = 600;    // Kilit süresi (10 dk)
 const TOKEN_TTL_SECONDS = 21600; // Oturum süresi (6 saat, CacheService üst sınırı)
 
 function doPost(e) {
+  // Geçerli oturumla gelen isteklerde hata nedeni panele yazılır; diğerlerine ayrıntı verilmez.
+  let trusted = false;
   try {
     const data = parsePayload_(e);
     const action = String(data.action || 'save');
+    trusted = (action === 'list' || action === 'save') && isTokenValid_(data.token);
 
     if (action === 'login') {
       // Kilit, eşzamanlı denemelerin hata sayacını atlatmasını engeller.
@@ -73,10 +76,21 @@ function doPost(e) {
     if (err && err.panelCode) {
       return json_({ success: false, code: err.panelCode, error: err.message });
     }
-    // Beklenmeyen hata: ayrıntı yalnızca Yürütmeler günlüğüne yazılır, istemciye sızdırılmaz.
+    // Beklenmeyen hata: ayrıntı günlüğe yazılır; panele yalnızca giriş yapmış kullanıcı için gönderilir.
     console.error(err && err.stack ? err.stack : String(err));
-    return json_({ success: false, code: 'SERVER', error: 'Sunucu hatası. Lütfen tekrar deneyin.' });
+    return json_({
+      success: false,
+      code: 'SERVER',
+      error: trusted ? describeError_(err) : 'Sunucu hatası. Lütfen tekrar deneyin.'
+    });
   }
+}
+
+function describeError_(err) {
+  const msg = String(err && err.message ? err.message : err).slice(0, 300);
+  const izinSorunu = /permission|authoriz|izin|yetki/i.test(msg);
+  return 'Sunucu hatası: ' + msg +
+    (izinSorunu ? ' | Çözüm: Apps Script editöründe "kontrol" işlevini çalıştırıp istenen izinlerin tümünü onaylayın.' : '');
 }
 
 function withLock_(fn) {
@@ -122,9 +136,13 @@ function logout_(token) {
   if (isTokenShaped_(t)) CacheService.getScriptCache().remove('tok_' + t);
 }
 
-function requireToken_(token) {
+function isTokenValid_(token) {
   const t = String(token || '');
-  if (!isTokenShaped_(t) || !CacheService.getScriptCache().get('tok_' + t)) {
+  return isTokenShaped_(t) && !!CacheService.getScriptCache().get('tok_' + t);
+}
+
+function requireToken_(token) {
+  if (!isTokenValid_(token)) {
     throw fail_('AUTH', 'Oturum geçersiz veya süresi dolmuş. Lütfen PIN ile tekrar giriş yapın.');
   }
 }
@@ -168,7 +186,10 @@ function listEvents_() {
 
     const cols = d.slice();
     // Tarih hücre biçiminden bağımsız olarak GG.AA.YYYY gönderilir.
-    if (isDate_(v[1])) cols[1] = Utilities.formatDate(v[1], tz, 'dd.MM.yyyy');
+    if (isDate_(v[1])) {
+      try { cols[1] = Utilities.formatDate(v[1], tz, 'dd.MM.yyyy'); }
+      catch (formatErr) { /* biçimlenemezse hücrede görünen değer kalır */ }
+    }
     // Saat, hücrede görünen değerden alınır (SS:DD).
     const hm = /^(\d{1,2}):(\d{2})/.exec(d[2]);
     if (hm) cols[2] = ('0' + hm[1]).slice(-2) + ':' + hm[2];
@@ -380,10 +401,26 @@ function debugLog_(stage, obj) {
   console.log(stage + ' ' + JSON.stringify(obj || {}));
 }
 
-// Drive iznini bir kez manuel tetiklemek için Apps Script editörde çalıştırın.
-function authorizeDriveAccess() {
-  const root = DriveApp.getRootFolder();
-  return 'Drive authorization OK: ' + root.getName();
+// KURULUM KONTROLÜ: editörde işlev listesinden "kontrol" seçip Çalıştır'a basın.
+// Eksik izin varsa Google izin penceresini açar (tümünü onaylayın); ardından tabloyu
+// gerçekten okuyup sonucu alttaki "Yürütme günlüğü"ne yazar. Hata varsa nedeni orada görünür.
+function kontrol() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error('Bu betik bir tabloya bağlı değil. Kodu, etkinlik tablosunun Uzantılar > Apps Komut Dosyası editörüne yapıştırın.');
+  }
+  const sheet = getSheet_();
+  const rows = listEvents_();          // panelin yaptığı okumanın aynısı
+  DriveApp.getRootFolder().getName();  // dosya yükleme için Drive izni
+  const pin = PropertiesService.getScriptProperties().getProperty('PANEL_PIN') || '';
+
+  const ozet = 'TAMAM | tablo: ' + ss.getName() +
+    ' | sekme: ' + sheet.getName() +
+    ' | okunan etkinlik: ' + rows.length +
+    ' | PANEL_PIN: ' + (pin.length >= MIN_PIN_LENGTH ? 'ayarlı' : 'EKSİK ya da 8 karakterden kısa') +
+    ' | sürüm: ' + API_VERSION;
+  console.log(ozet);
+  return ozet;
 }
 
 // GET yalnızca durum ve sürüm bilgisi verir; hiçbir veri döndürmez.
