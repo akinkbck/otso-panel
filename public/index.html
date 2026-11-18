@@ -423,6 +423,22 @@
     }
     .btn-edit:hover { background: #ebf4ff; border-color: #2563a8; color: #2563a8; }
 
+    /* DELETE BUTTON */
+    .btn-delete {
+      background: none;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: #b91c1c;
+      margin-left: 4px;
+      transition: all 0.15s;
+    }
+    .btn-delete:hover { background: #fee2e2; border-color: #dc2626; }
+    .btn-delete:disabled { opacity: 0.5; cursor: wait; }
+    .row-actions { white-space: nowrap; }
+
     /* RESPONSIVE */
     @media (max-width: 700px) {
       main { padding: 16px; }

@@ -14,12 +14,13 @@
 
 // Panel (/api/config) bu sayıya bakar: 2'den küçükse arka ucu korumasız sayar ve
 // adresini tarayıcıya vermez. Yalnızca istek biçimi değişirse artırın.
-const API_VERSION = 2;
+const API_VERSION = 3; // 3: silme (delete) işlemi eklendi
 
 const SHEET_NAME = 'Sayfa1'; // Sheets'teki sekme adı neyse onu yazın
 const PUBLIC_VIEW = false;   // true: etkinlik listesi PIN'siz görüntülenir (yazma yine PIN ister)
 const DRIVE_FOLDER_ID = ''; // Boş bırakırsanız UPLOAD_FOLDER_NAME adlı klasör otomatik oluşturulur
 const UPLOAD_FOLDER_NAME = 'Ordu TSO Etkinlik Dosyaları';
+const TRASH_SHEET_NAME = 'Silinenler'; // Silinen etkinlikler bu sekmeye taşınır (geri alınabilsin diye)
 const DEBUG_ENABLED = false; // true: Apps Script > Yürütmeler günlüğüne yazar (tabloya değil)
 
 const COLUMN_COUNT = 14;     // A..N: Etkinlik Adı ... Notlar
@@ -51,7 +52,7 @@ function doPost(e) {
   try {
     const data = parsePayload_(e);
     const action = String(data.action || 'save');
-    trusted = (action === 'list' || action === 'save') && isTokenValid_(data.token);
+    trusted = (action === 'list' || action === 'save' || action === 'delete') && isTokenValid_(data.token);
 
     if (action === 'login') {
       // Kilit, eşzamanlı denemelerin hata sayacını atlatmasını engeller.
@@ -68,6 +69,11 @@ function doPost(e) {
     if (action === 'save') {
       requireToken_(data.token);
       withLock_(function () { saveEvent_(data); });
+      return json_({ success: true });
+    }
+    if (action === 'delete') {
+      requireToken_(data.token);
+      withLock_(function () { deleteEvent_(data); });
       return json_({ success: true });
     }
     throw fail_('VALIDATION', 'Bilinmeyen işlem.');
@@ -215,16 +221,7 @@ function saveEvent_(data) {
   const tarih = date_(data.tarih);
   if (!tarih) throw fail_('VALIDATION', 'Geçerli bir tarih girin.');
 
-  let rowIndex = 0;
-  const rawRow = data.rowIndex;
-  if (rawRow !== undefined && rawRow !== null && rawRow !== '') {
-    // Yalnızca düz tam sayı kabul edilir ("2abc", 2.5, [2] gibi değerler reddedilir).
-    const isPlainInt = (typeof rawRow === 'number' || typeof rawRow === 'string') && /^\d+$/.test(String(rawRow));
-    rowIndex = isPlainInt ? Number(rawRow) : NaN;
-    if (!Number.isInteger(rowIndex) || rowIndex < 2 || rowIndex > sheet.getLastRow()) {
-      throw fail_('VALIDATION', 'Güncellenecek satır bulunamadı. Sayfayı yenileyip tekrar deneyin.');
-    }
-  }
+  const rowIndex = parseRowIndex_(data.rowIndex, sheet); // 0: yeni kayıt
 
   // Dosya, Drive'a yazılmadan önce doğrulanır.
   const blob = readUpload_(data);
@@ -268,6 +265,78 @@ function saveEvent_(data) {
   }
 
   debugLog_(rowIndex ? 'SHEET_UPDATE' : 'SHEET_APPEND', { rowIndex: rowIndex, fileSaved: !!newFile });
+}
+
+// Satır numarasını doğrular. Boşsa 0 döner; geçersizse ya da tabloda yoksa hata verir.
+// Yalnızca düz tam sayı kabul edilir ("2abc", 2.5, [2] gibi değerler reddedilir).
+function parseRowIndex_(rawRow, sheet) {
+  if (rawRow === undefined || rawRow === null || rawRow === '') return 0;
+  const isPlainInt = (typeof rawRow === 'number' || typeof rawRow === 'string') && /^\d+$/.test(String(rawRow));
+  const rowIndex = isPlainInt ? Number(rawRow) : NaN;
+  if (!Number.isInteger(rowIndex) || rowIndex < 2 || rowIndex > sheet.getLastRow()) {
+    throw fail_('VALIDATION', 'Satır bulunamadı. Sayfayı yenileyip tekrar deneyin.');
+  }
+  return rowIndex;
+}
+
+// ── SİLME ───────────────────────────────────────────────────
+
+// Etkinliği "Silinenler" sekmesine taşır, sonra tablodan siler. Ekli dosya, panelin
+// yükleme klasöründeyse Drive çöp kutusuna gönderilir (30 gün içinde geri alınabilir).
+function deleteEvent_(data) {
+  const sheet = getSheet_();
+  const rowIndex = parseRowIndex_(data.rowIndex, sheet);
+  if (!rowIndex) throw fail_('VALIDATION', 'Silinecek satır belirtilmedi.');
+
+  // Yanlış satırı silmemek için: satır, panelin gördüğü kayıtla hâlâ aynı mı?
+  const current = listEvents_().filter(function (r) { return r.row === rowIndex; })[0];
+  const sameRecord = current &&
+    String(current.c[0]) === String(data.ad == null ? '' : data.ad) &&
+    String(current.c[1]) === String(data.tarih == null ? '' : data.tarih);
+  if (!sameRecord) {
+    throw fail_('VALIDATION', 'Bu kayıt siz açtıktan sonra değişmiş. Sayfayı yenileyip tekrar deneyin.');
+  }
+
+  // Arşive hücrelerde görünen değerler yazılır (tarih, saat ve sayılar okunduğu gibi kalır).
+  const shown = sheet.getRange(rowIndex, 1, 1, COLUMN_COUNT).getDisplayValues()[0];
+  getTrashSheet_(sheet).appendRow(shown.map(asLiteral_).concat([new Date()]));
+  sheet.deleteRow(rowIndex);
+  trashUploadedFile_(shown[FILE_LINK_COLUMN - 1]);
+
+  debugLog_('SHEET_DELETE', { rowIndex: rowIndex });
+}
+
+function getTrashSheet_(sourceSheet) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let trash = ss.getSheetByName(TRASH_SHEET_NAME);
+  if (!trash) {
+    // Sona eklenir; etkinlik sekmesinin sırası ve adı değişmez.
+    trash = ss.insertSheet(TRASH_SHEET_NAME, ss.getNumSheets());
+    const header = sourceSheet.getRange(1, 1, 1, COLUMN_COUNT).getDisplayValues()[0];
+    trash.appendRow(header.map(asLiteral_).concat(['Silinme Zamanı']));
+  }
+  return trash;
+}
+
+// Metni olduğu gibi (formüle ya da sayıya dönüşmeden) yazdırmak için başına kesme işareti koyar.
+function asLiteral_(v) {
+  return typeof v === 'string' && v !== '' ? "'" + v : v;
+}
+
+// Yalnızca panelin kendi yükleme klasöründeki dosyaya dokunur; elle girilmiş başka bağlantılar etkilenmez.
+function trashUploadedFile_(link) {
+  try {
+    const m = /\/d\/([A-Za-z0-9_-]+)/.exec(String(link || ''));
+    const folderId = DRIVE_FOLDER_ID || PropertiesService.getScriptProperties().getProperty('UPLOAD_FOLDER_ID');
+    if (!m || !folderId) return;
+    const file = DriveApp.getFileById(m[1]);
+    const parents = file.getParents();
+    while (parents.hasNext()) {
+      if (parents.next().getId() === folderId) { file.setTrashed(true); return; }
+    }
+  } catch (err) {
+    // Dosya bulunamadıysa ya da erişilemiyorsa kayıt silme işlemi yine de tamamlanır.
+  }
 }
 
 // ── DOSYA ───────────────────────────────────────────────────

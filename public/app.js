@@ -297,7 +297,7 @@ function renderTable(rows) {
       <td>${r[11] ? `<span class="cat">${esc(r[11])}</span>` : ''}</td>
       <td>${dosya ? `<a href="${esc(dosya)}" target="_blank" rel="noopener noreferrer">Dosya</a>` : ''}</td>
       <td style="color:#718096;font-size:0.82rem">${esc(r[13])}</td>
-      <td><button class="btn-edit" type="button" data-row="${sr}">Düzenle</button></td>
+      <td class="row-actions"><button class="btn-edit" type="button" data-row="${sr}">Düzenle</button><button class="btn-delete" type="button" data-row="${sr}">Sil</button></td>
     </tr>`;
   }).join('');
   showState('data-table');
@@ -380,6 +380,37 @@ function openEditModal(sheetRow) {
 
 function closeModal() {
   $('modal-overlay').classList.remove('open');
+}
+
+//  SİLME
+function deleteEvent(sheetRow, btn) {
+  requireAuth(async () => {
+    const row = allRows.find(r => r._sheetRow === sheetRow);
+    if (!row) return;
+    const onay = window.confirm(
+      '"' + row[0] + '" (' + row[1] + ') etkinliği silinsin mi?\n\n' +
+      'Kayıt tablodaki "Silinenler" sekmesine taşınır; ekli dosya Drive çöp kutusuna gönderilir.'
+    );
+    if (!onay) return;
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Siliniyor...'; }
+    try {
+      // Ad ve tarih de gönderilir: tablo bu arada değiştiyse sunucu yanlış satırı silmez.
+      await api({ action: 'delete', token: getToken(), rowIndex: sheetRow, ad: row[0], tarih: row[1] });
+      await loadData();
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Sil'; }
+      if (err.code === 'AUTH') {
+        clearToken();
+        updateLockBadge();
+        requireAuth(() => {});
+        return;
+      }
+      window.alert(err.message === 'Bilinmeyen işlem.'
+        ? 'Silme özelliği için sunucu tarafının (Apps Script) güncellenmesi gerekiyor.'
+        : 'Silinemedi: ' + err.message);
+    }
+  });
 }
 
 //  FORM GÖNDER
@@ -487,8 +518,10 @@ function init() {
     if (th) sortTable(Number(th.dataset.sort));
   });
   $('table-body').addEventListener('click', e => {
-    const btn = e.target.closest('.btn-edit');
-    if (btn) openEditModal(Number(btn.dataset.row));
+    const editBtn = e.target.closest('.btn-edit');
+    if (editBtn) { openEditModal(Number(editBtn.dataset.row)); return; }
+    const delBtn = e.target.closest('.btn-delete');
+    if (delBtn && !delBtn.disabled) deleteEvent(Number(delBtn.dataset.row), delBtn);
   });
 
   $('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkPin(); });

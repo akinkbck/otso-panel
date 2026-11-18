@@ -15,6 +15,7 @@ Etkinlikleri Google Sheets'te tutan, PIN ile korunan küçük bir yönetim panel
 - Tablo "Kısıtlı" paylaşımda kalır; veriyi yalnızca Apps Script okur ve PIN ile giriş yapanlara verir.
 - PIN sunucuda doğrulanır. 10 hatalı denemeden sonra giriş 10 dakika kilitlenir; oturum 6 saat sürer.
 - `/api/config`, Apps Script korumalı sürümde değilse adresi tarayıcıya vermez.
+- Silinen etkinlik tablodaki "Silinenler" sekmesine taşınır; ekli dosya Drive çöp kutusuna gider. İkisi de geri alınabilir.
 
 ## Kurulum
 
